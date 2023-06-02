@@ -25,7 +25,8 @@ Before continuing, ensure you can run strapi with Docker.
 
 Add the following to the docker-compose.yml file
 
-```JSON
+```yml
+services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.9.3
     container_name: elastic-search
@@ -85,7 +86,7 @@ volumes/logstash/config/pipelines.yml
 volumes/logstash/pipeline/incremental.conf
 ```
 Add the following to pipelines.yml
-```JSON
+```yml
 - pipeline.id: incremental
   path.config: "/usr/share/logstash/pipeline/incremental.conf"
 ```
