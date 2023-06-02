@@ -1,0 +1,105 @@
+version: '3'
+services:
+  elastic-strapi:
+    container_name: elastic-strapi
+    build:
+      context: ./elastic-strapi
+      dockerfile: Dockerfile
+    image: elastic-strapi:latest
+    restart: unless-stopped
+    env_file: /elastic-strapi/.env
+    environment:
+      DATABASE_HOST: elastic-strapiDB
+    volumes:
+      - ./elastic-strapi/config:/opt/app/config
+      - ./elastic-strapi/src:/opt/app/src
+      - ./elastic-strapi/package.json:/opt/package.json
+      - ./elastic-strapi/package-lock.json:/opt/package-lock.json
+
+      - ./elastic-strapi/.env:/opt/app/.env
+      - ./elastic-strapi/public/uploads:/opt/app/public/uploads
+    ports:
+      - '1337:1337'
+    networks:
+      - elastic-strapi
+    depends_on:
+      - elastic-strapiDB
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.9.3
+    container_name: elastic-search
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - ./volumes/elasticsearch:/usr/share/elasticsearch/data
+    logging:
+        driver: "json-file"
+        options:
+            max-size: "10k"
+            max-file: "10"
+
+  logstash:
+    build:
+      context: .
+      dockerfile: Dockerfile.logstash
+    container_name: elastic-logstash
+    depends_on:
+      - elastic-strapiDB
+      - elasticsearch
+    volumes:
+      - ./volumes/logstash/pipeline/:/usr/share/logstash/pipeline/
+      - ./volumes/logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.9.3
+    container_name: elastic-kibana
+    environment:
+      - "ELASTICSEARCH_URL=http://elasticsearch:9200"
+      - "SERVER_NAME=127.0.0.1"
+    ports:
+      - 5601:5601
+    depends_on:
+      - elasticsearch
+
+  elastic-strapiDB:
+    container_name: elastic-strapiDB
+    platform: linux/amd64 #for platform error on Apple M1 chips
+    restart: unless-stopped
+    env_file: /elastic-strapi/.env
+    image: mysql:latest
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_USER: dbuser
+      MYSQL_ROOT_PASSWORD: dbpassword
+      MYSQL_PASSWORD: dbpassword
+      MYSQL_DATABASE: strapi
+    volumes:
+      - elastic-strapi-data:/var/lib/mysql
+      #- ./data:/var/lib/postgresql/data/ # if you want to use a bind folder
+    ports:
+      - '3306:3306'
+    networks:
+      - elastic-strapi
+      
+  # elastic-strapiAdminer:
+  #   container_name: elastic-strapiAdminer
+  #   image: adminer
+  #   restart: unless-stopped
+  #   ports:
+  #     - '9090:8080'
+  #   environment:
+  #     - ADMINER_DEFAULT_SERVER=elastic-strapiDB
+  #   networks:
+  #     - elastic-strapi
+  #   depends_on:
+  #     - elastic-strapiDB
+
+volumes:
+  elastic-strapi-data:
+
+networks:
+  elastic-strapi:
+    name: Elastic-strapi
+    driver: bridge
